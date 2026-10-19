@@ -36,6 +36,7 @@ include(
     "example-plugin",
     "tools:osrs-mcp",
     "tools:wiki-dumping",
+    "tools:launcher",
 )
 
 includeProjects(project(":api"))
