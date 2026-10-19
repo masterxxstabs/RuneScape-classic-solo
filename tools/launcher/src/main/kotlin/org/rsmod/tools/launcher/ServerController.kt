@@ -63,7 +63,9 @@ class ServerController(private val root: Path, private val log: (String) -> Unit
         log("Installing the server. The first install downloads the OSRS cache and takes a while.")
         syncRevision()
         val previousConfig = gameConfig.path.takeIf { it.isRegularFile() }?.readBytes()
-        val success = gradle("install") && gradle(":or-cache:mergePluginGamevals")
+        // The root install task is not configuration-cache compatible and fails the build with it.
+        val success =
+            gradle(NO_CONFIGURATION_CACHE, "install") && gradle(":or-cache:mergePluginGamevals")
         previousConfig?.let(gameConfig.path::writeBytes)
         if (gameConfig.exists) {
             gameConfig.writeRates(rates)
@@ -88,6 +90,10 @@ class ServerController(private val root: Path, private val log: (String) -> Unit
         }
         setState(ServerState.Busy)
         gameConfig.writeRates(rates)
+        if (!claimPorts()) {
+            setState(idleState())
+            return false
+        }
         log("Building the server...")
         if (!gradle(":server:app:shadowJar")) {
             log("Server build failed - see the log above.")
@@ -154,6 +160,34 @@ class ServerController(private val root: Path, private val log: (String) -> Unit
         }
     }
 
+    private fun claimPorts(): Boolean =
+        when (val claim = ServerPorts(gameConfig).claim()) {
+            is PortClaim.Ready -> {
+                for (move in claim.moves) {
+                    log(
+                        "Port ${move.from} is used by another program, so the account server's " +
+                            "central.${move.setting} moves to ${move.to} (saved in game.yml)."
+                    )
+                }
+                true
+            }
+            is PortClaim.GamePortInUse -> {
+                log(
+                    "Port ${claim.port} is already in use, so the game server can't start. " +
+                        "Another game server is probably still running: close it, or restart " +
+                        "your computer, and try again. You can also change game-port in game.yml."
+                )
+                false
+            }
+            is PortClaim.NoFreePort -> {
+                log(
+                    "Port ${claim.port} (central.${claim.setting} in game.yml) is in use and no " +
+                        "free port was found after it."
+                )
+                false
+            }
+        }
+
     private fun gradle(vararg tasks: String): Boolean {
         val wrapper = root.resolve(if (IS_WINDOWS) "gradlew.bat" else "gradlew")
         if (!IS_WINDOWS) {
@@ -195,6 +229,8 @@ class ServerController(private val root: Path, private val log: (String) -> Unit
     companion object {
         const val READY_MARKER: String = "Server ready in"
         const val STOP_COMMAND: String = "stop"
+
+        private const val NO_CONFIGURATION_CACHE = "--no-configuration-cache"
 
         private const val START_TIMEOUT_MINUTES = 10L
         private const val GRACEFUL_STOP_SECONDS = 60L

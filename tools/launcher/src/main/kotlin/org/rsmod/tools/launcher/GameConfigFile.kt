@@ -91,6 +91,18 @@ class GameConfigFile(val path: Path, private val fallback: Path? = null) {
 
     fun serverName(): String = readTree().path("name").asText(DEFAULT_NAME)
 
+    fun hasEmbeddedCentral(): Boolean =
+        readTree().path("central").path("same-instance").asBoolean(false)
+
+    fun centralPort(setting: String, default: Int): Int =
+        readTree().path("central").path(setting).asInt(default)
+
+    fun setCentralPort(setting: String, port: Int) {
+        val root = readTree() as? ObjectNode ?: YAML.createObjectNode()
+        root.withObjectProperty("central").put(setting, port)
+        write(root)
+    }
+
     private fun write(root: JsonNode) {
         val temp = Files.createTempFile(path.toAbsolutePath().parent, "game", ".yml.tmp")
         temp.writeText(HEADER + YAML.writeValueAsString(root))

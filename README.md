@@ -97,11 +97,12 @@ On this server everyone who logs in is an admin, so you can use `::` commands in
 ## Running it without the launcher
 
 ```sh
-./gradlew install          # first time only: downloads the cache, creates game.yml and RSA keys
-./gradlew run              # starts the server; it is ready when it prints "Server ready in ..."
+./gradlew install --no-configuration-cache   # first time only: cache, game.yml and RSA keys
+./gradlew run                                # it is ready when it prints "Server ready in ..."
 ```
 
-On Windows, use `gradlew.bat` instead of `./gradlew`.
+On Windows, use `gradlew.bat` instead of `./gradlew`. `install` needs `--no-configuration-cache`;
+without it Gradle reports "Configuration cache problems found" and the build fails at the end.
 
 Then create `~/.rsprox/proxy-targets.yaml` (on Windows: `%USERPROFILE%\.rsprox\proxy-targets.yaml`).
 Replace the modulus with the `Modulus:` value from `.data/client.key`:
@@ -184,8 +185,13 @@ Close the issue afterwards. The next sync continues from there.
 - **RuneLite says it can't connect.** Check that the launcher shows **Server: Online**, and that
   RSProx has **OpenRune Solo** selected. If you re-installed, press **Play** once more: it
   rewrites the RSProx target with your server's new key.
-- **Port 43594 is in use.** Another server is still running. Stop it, or change `game-port` in
-  `game.yml` and press **Play** again.
+- **Port 43594 is already in use.** Another game server is still running. Close it or restart
+  your computer, or change `game-port` in `game.yml`, then press **Play** again.
+- **`BindException: Address already in use` in the log.** The server also runs a small account
+  server on ports 8080 and 9091, and another program on your computer may already use one of them.
+  The launcher checks these ports before each start, moves a busy one to the next free port and
+  saves it in `game.yml` (`central.http-port` and `central.link-port`). If you start the server
+  without the launcher, set those two keys yourself.
 - **Out of memory.** The server is started with up to 4 GB of RAM. Close other programs or
   lower `-Xmx4g` in `tools/launcher/src/main/kotlin/org/rsmod/tools/launcher/ServerController.kt`.
 
