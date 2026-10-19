@@ -1,127 +1,182 @@
+# RuneScape Classic Solo
 
+Your own Old School RuneScape private server. You play it in **RuneLite**, and you choose the
+**XP, gathering and drop rates** yourself.
 
+It is built from three open-source projects:
 
-<h1 align="center">
-  <img width="333" height="82" alt="Asset 5" src="https://github.com/user-attachments/assets/0a892a2f-9ad6-43f9-affa-2e9a865a1d70" />
-</h1>
+| Part | What it does |
+|---|---|
+| [OpenRune Server](https://github.com/OpenRune/OpenRune-Server) | The game server (OSRS revision 241, written in Kotlin). This repository is a fork of it. |
+| **Launcher** (`tools/launcher`) | A desktop app that installs and starts the server, edits rates and opens the game. |
+| [RSProx](https://github.com/blurite/rsprox) | Opens the real RuneLite client and points it at your server instead of Jagex's. |
 
-<p align="center">
-  <a href="https://github.com/OpenRune/OpenRune-Server/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/OpenRune/OpenRune-Server?style=for-the-badge&color=6f42c1"/></a>
-  <a href="https://oldschool.runescape.wiki/w/Update:Leagues_V:_Raging_Echos_Rewards_Are_Here"><img alt="Revision 241" src="https://img.shields.io/badge/Revision-241-blueviolet?style=for-the-badge"/></a>
-  <a href="https://trello.com/b/A0LefFDs/later"><img alt="Roadmap" src="https://img.shields.io/badge/Trello-Roadmap-026AA7?style=for-the-badge&logo=trello&logoColor=white"/></a>
-  <a href="https://github.com/Mark7625/OpenRune-Server/"><img alt="Lines of Code" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fghloc.vercel.app%2Fapi%2FOpenRune%2FOpenRune-Server%2Fbadge%3Fformat%3Dhuman&style=for-the-badge&color=teal"/></a>
-  <a href="https://discord.gg/v2qcXzBCwf">
-    <img alt="Discord" src="https://img.shields.io/discord/1445802914156249241?label=Discord&logo=discord&logoColor=white&style=for-the-badge&color=5865F2"/>
-  </a>
-</p>
+Everything runs on your own computer. Nothing is shared online, and you don't need an account
+anywhere.
 
-<p align="center">OpenRune Server is a modular fork of RSMod/Alter that powers an OSRS-compatible server with a plug-and-play plugin ecosystem focused on extensibility and ease of use.</p>
+> [!NOTE]
+> This is a fan project for personal and educational use. It is not affiliated with Jagex. The OSRS
+> game cache is not stored in this repository; the install step downloads it from
+> [OpenRS2](https://archive.openrs2.org).
 
-## 🤔 What is OpenRune Server?
-OpenRune Server builds on the foundation laid by [RSMod](https://github.com/rsmod/rsmod) to deliver a flexible, developer-friendly OSRS game server. Its modular architecture lets you ship new gameplay features as standalone plugins without touching core engine code. Server owners with little to no programming experience can rely on contributors to drop prebuilt plugins into the `content` module and have them load automatically at runtime.
+## What you need
 
-## 🚀 Why Choose OpenRune Server?
-### 🔧 Modular by design
-OpenRune Server loads plugins dynamically, making it simple to extend gameplay, content, or systems while keeping the base server clean.
+- **Windows or Linux.** RSProx can't connect RuneLite to private servers on macOS.
+- **Java 21:** [Adoptium Temurin 21](https://adoptium.net/temurin/releases/?version=21). On
+  Windows, tick *"Set JAVA_HOME"* in the installer.
+- About 3 GB of free disk space and 8 GB of RAM.
 
-### 👥 Community-driven
-Active maintainers review contributions, publish roadmap updates, and support users through Discord and Trello.
+## Quick start
 
-### 📏 OSRS-compatible
-OpenRune Server adheres to OSRS protocols, giving you the freedom to connect any compliant client and customize server-side behavior.
+1. Download this repository (**Code → Download ZIP** and unzip it, or `git clone` it).
+2. Start the launcher:
+   - **Windows:** double-click `Launcher.bat`.
+   - **Linux:** run `./launcher.sh` in a terminal.
 
+   The first start builds the launcher, which takes a few minutes.
+3. Set your rates on the left side of the launcher (see [Rates](#rates)).
+4. Click **Play**. On the first run the launcher:
+   1. installs the server: it downloads the OSRS cache and builds everything, which takes
+      5-15 minutes;
+   2. starts the server and waits until it is online;
+   3. downloads and opens **RSProx**.
+5. In the RSProx window, set the client to **RuneLite** and the proxy target to
+   **OpenRune Solo**, then click **Launch**. RSProx remembers these choices.
+6. Log in to RuneLite with **any username and password**. The account is created the first time
+   you log in, and it is an admin account (see [Commands](#admin-commands)).
 
-<!-- content-progress:start -->
+Next time, open the launcher and click **Play**.
 
-## 📊 Content progress
+## Rates
 
-Skills **20/23** · Bosses **23/169** · Raids **0/4** · Minigames **1/52**
+| Setting | What it changes | Live OSRS |
+|---|---|---|
+| **XP rate** | Multiplies the experience from everything you do. Presets: 1x, 5x, 10x, 25x, 50x, 100x. | 1 |
+| **Gather success** | How likely each woodcutting, mining, fishing or thieving attempt is to succeed. At high values every attempt succeeds, so the action's normal speed becomes the limit. | 1 |
+| **Gather yield** | Resources from each successful chop, mine or catch. `2` gives double logs, ore and fish. `1.5` gives an extra resource half of the time. Extras only go into free inventory space. | 1 |
+| **Drop rate** | Multiplies the chance of boosted rare drops (2 turns 1/512 into 1/256). | 1 |
 
-Full breakdown in **[PROGRESS.md](PROGRESS.md)**, including every content module and
-the bosses that already have drop tables and only need the encounter writing.
+**Per-skill rates...** lets you override any of these for single skills, for example 5x
+Prayer while everything else stays 25x. Leave a cell empty to use the global rate.
 
-<!-- content-progress:end -->
-## 📚 Wiki
+Press **Save rates** to store them. Rates apply when the server starts, so if it is already
+running the launcher offers to restart it. Log out in-game first so your progress is saved.
 
-Browse the OpenRune Server wiki at **[openrune.github.io](https://openrune.github.io/)** — an interactive graph of the codebase beside a live Markdown reader, covering architecture, cache, gameplay, interfaces, networking, operations, persistence, plugins and testing.
+The launcher stores the rates in `game.yml`, and you can edit that file directly too:
 
-The pages are generated by [OpenWiki](https://github.com/langchain-ai/openwiki) and committed under [`openwiki/`](openwiki), so they version alongside the code and can be read straight from the repo — start at [`openwiki/quickstart.md`](openwiki/quickstart.md). The published site rebuilds from `main`.
+```yaml
+gameplay:
+  xp-rates:
+    multiplier: 25.0          # every skill
+    skills: { prayer: 5.0 }   # overrides for single skills
+  gather-rates:
+    success-multiplier: 2.0
+    yield-multiplier: 1.5
+    skills:
+      woodcutting: { success-multiplier: 3.0, yield-multiplier: 2.0 }
+  drop-rates:
+    multiplier: 1.0
+```
 
-## 🛠️ Getting Started
+`game.example.yml` documents every key. Typos in skill names, and rates of zero or below, stop
+the server at startup with a message that says which setting is wrong.
 
+## Admin commands
 
+On this server everyone who logs in is an admin, so you can use `::` commands in the chat box:
 
-1. **Clone the repository**
-   - `File → New → Project from Version Control` in IntelliJ, then paste `https://github.com/OpenRune/OpenRune-Server.git`.
-   - Alternatively, clone via Git CLI and open the project manually.
+| Command | Effect |
+|---|---|
+| `::item coins 1000000` | Spawns items (by name or id). |
+| `::master` / `::reset` | Sets all stats to 99, or back to 1. |
+| `::tele 0_50_50_22_18` | Teleports to a coordinate. `::mypos` shows where you are. |
+| `::openbank` | Opens your bank. |
+| `::god` | Toggles invincibility. |
 
-2. **Install dependencies**
-   - Ensure you have [IntelliJ IDEA](https://www.jetbrains.com/idea/download/#section=windows).
-   - Set the project SDK to Java 21: `File → Project Structure → SDK`. (The `:tools:osrs-mcp` module is built with Java 17 via Gradle’s JVM toolchain; other modules target Java 21.)
-   - Recommended: install the Rsc plugin in root of the project [OpenRune IntelliJ Tools-1.0.zip](https://github.com/OpenRune/OpenRune-Server/blob/main/OpenRune%20IntelliJ%20Tools-1.0.zip) for better entity reference tooling.
+## Running it without the launcher
 
-   - #### You may need to point the settings file [openRune-intelliJ-tools.toml](https://github.com/OpenRune/OpenRune-Server/blob/main/openRune-intelliJ-tools.toml) like so
+```sh
+./gradlew install          # first time only: downloads the cache, creates game.yml and RSA keys
+./gradlew run              # starts the server; it is ready when it prints "Server ready in ..."
+```
 
+On Windows, use `gradlew.bat` instead of `./gradlew`.
 
-   <img width="300" height="300" alt="image" src="https://github.com/user-attachments/assets/7aa46983-1f84-4c08-abf8-2f17bc72f073" />
-
-
-4. **Gradle bootstrap**
-   - Open the Gradle tool window.
-   - Run `OpenRune Server → Tasks → installation → install`.
-   - When the task completes, run `OpenRune Server → Tasks → application → run`.
-
-5. **Verify startup**
-   - A successful boot prints `OpenRune Server Successfully initialized` in the terminal.
-   - If you only see `OpenRune Server Loaded up in x ms.` you likely skipped a step.
-
-Screenshots showcasing each step are available in the repo under `Resources/main/docs/resources/ReadMe_OpenRune Server/`.
-
-## 🎮 Client Setup
-> [!TIP]
-> Use [RSProx](https://github.com/blurite/rsprox/releases) to connect; it is actively maintained by trusted developers and supports the required OSRS protocols.
-
-For Windows:
-1. Press `⊞ + R` and enter `%USERPROFILE%`.
-2. Locate (or create) the `.rsprox` directory.
-3. Create `proxy-targets.yaml` with:
+Then create `~/.rsprox/proxy-targets.yaml` (on Windows: `%USERPROFILE%\.rsprox\proxy-targets.yaml`).
+Replace the modulus with the `Modulus:` value from `.data/client.key`:
 
 ```yaml
 config:
-  - id: 1
-    name: OpenRune Server
+  - name: OpenRune Solo
     jav_config_url: https://client.blurite.io/jav_local_241.ws
+    revision: "241"
+    modulus: PASTE_MODULUS_HERE
     varp_count: 15000
-    revision: 241
-    modulus: YOUR_MODULUS_KEY_HERE
+    game_server_port: 43594
+    export_binaries: false
 ```
 
-Find the modulus in the project root `.data/client.key`, copy it exactly, and replace `YOUR_MODULUS_KEY_HERE`. If `.rsprox` does not exist, launching RSProx once will create it.
-Note: RSprox for Private Servers only works currently on Windows and Linux, NOT MacOS!
+Start RSProx from its [releases page](https://github.com/blurite/rsprox/releases), choose
+RuneLite and **OpenRune Solo**, and launch.
 
-> [!WARNING]
-> And stay away from client's like Devious, as they have been caught adding Account Stealer into their client.
-## 🤖 AI testing (MCP)
+To stop the server cleanly, type `stop` into its console, or use the launcher's **Stop server**
+button.
 
-The [OpenRune-Developer-Tools](https://github.com/OpenRune/OpenRune-Developer-Tools) client plugin runs a local MCP server (`http://127.0.0.1:7780/mcp`) so AI agents like Claude can test server content in a live client: walk NPC dialogue trees, screenshot and diff interfaces, read varbits/clientscript history, interact with NPCs/objects/items and wait on game conditions. A live dashboard at `http://127.0.0.1:7780/` shows every call the AI makes, with results and screenshots. Setup, example prompts and verification flows are documented in [AGENTS.md](AGENTS.md).
+## What's in the game
 
-## 📦 Release builds
+OpenRune is still being built, so not all of OSRS is there yet:
 
-CI can produce a self-contained `openrune-server-release.zip` with `server.jar`, `game.yml`, and compiled `.data/`. Pushes to `production` publish automatically; other branches can be built manually from **Actions → Release Server**.
+- 20 of the 23 skills work. Agility, Fletching and Hunter are not done yet.
+- 23 bosses work, along with a number of quests, shops, the bank, Slayer, the collection log and
+  more.
 
-See [.github/docs/RELEASE_CI.md](.github/docs/RELEASE_CI.md) for what the workflow does, how to run it manually, and how to build from `production` vs `main`/feature branches.
+[PROGRESS.md](PROGRESS.md) lists everything that is done.
 
-## 🗺️ Project Planning
-- Public roadmap and task board: [OpenRune Server Trello](https://trello.com/b/A0LefFDs/later).
-- Trello write access and contributor listing are reserved for active maintainers—contact Chris via Discord with a short summary of your work if you need access.
+## Updating from OpenRune
 
-## 💬 Bug Reports & Support
-- Open an issue on [GitHub](https://github.com/OpenRune/OpenRune-Server/issues) with reproduction details.
-- Reach the team directly in the [Discord server](https://discord.gg/HAwN6N8F).
+This repository keeps OpenRune's full history, so you can pull in their newest content:
 
-## 🙏 Acknowledgments
-- Cache management powered by [OpenRune-FileStore](https://github.com/OpenRune/OpenRune-FileStore).
-- Original Base [RsMod2](https://github.com/rsmod/rsmod).
+```sh
+git remote add upstream https://github.com/OpenRune/OpenRune-Server.git   # once
+git fetch upstream
+git merge upstream/main
+```
 
-## 💙 Contributors
-<a href="https://github.com/OpenRune/OpenRune-Server/graphs/contributors" target="_blank"><img src="https://contrib.rocks/image?repo=OpenRune/OpenRune-Server&columns=18" alt="Avatars of all contributors"></a>
+After an update that changes the game revision, press **Install / Update** in the launcher.
+
+## Troubleshooting
+
+- **The launcher window doesn't open.** Run `java -version` in a terminal. It must say 21 or
+  newer.
+- **Install fails while downloading the cache.** OpenRS2 may be busy. Press
+  **Install / Update** again.
+- **RuneLite says it can't connect.** Check that the launcher shows **Server: Online**, and that
+  RSProx has **OpenRune Solo** selected. If you re-installed, press **Play** once more: it
+  rewrites the RSProx target with your server's new key.
+- **Port 43594 is in use.** Another server is still running. Stop it, or change `game-port` in
+  `game.yml` and press **Play** again.
+- **Out of memory.** The server is started with up to 4 GB of RAM. Close other programs or
+  lower `-Xmx4g` in `tools/launcher/src/main/kotlin/org/rsmod/tools/launcher/ServerController.kt`.
+
+The server's own log is in the launcher window. RSProx writes its log to
+`.launcher/rsprox.log`.
+
+## For developers
+
+Server content is written as Kotlin plugins in `content/`. Read [AGENTS.md](AGENTS.md) and the
+[OpenRune wiki](https://openrune.github.io/) before changing server code. These files were added on
+top of OpenRune:
+
+- `api/player/.../stat/SkillRates.kt`: the XP, gather-success and gather-yield multipliers.
+  They are applied in `statAdvance`, `statRandom` and `awardSkillingProduct`.
+- `content/other/rates`: loads `gameplay.xp-rates` and `gameplay.gather-rates` from `game.yml`.
+- `content/other/console`: stops the server cleanly when `stop` is typed on its console.
+- `tools/launcher`: the launcher (Kotlin + Swing). `./gradlew :tools:launcher:run` starts it
+  from source.
+
+## Credits and license
+
+The server is [OpenRune Server](https://github.com/OpenRune/OpenRune-Server), which is based on
+[RS Mod](https://github.com/rsmod/rsmod), under the ISC license (see [LICENSE.md](LICENSE.md)).
+[RSProx](https://github.com/blurite/rsprox) and [RuneLite](https://runelite.net) are separate
+projects, each under its own license. Old School RuneScape is a trademark of Jagex Ltd.
