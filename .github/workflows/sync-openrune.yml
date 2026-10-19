@@ -1,0 +1,133 @@
+name: Sync OpenRune
+
+# Merges new OpenRune-Server content into main once a day, but only pushes after the merged code
+# builds, passes its tests and boots. The launcher's Update button then pulls it to players.
+
+permissions:
+  contents: write
+  issues: write
+
+on:
+  schedule:
+    - cron: "37 5 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: sync-openrune
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: merge, verify & push
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Merge OpenRune main
+        id: merge
+        run: .github/scripts/merge-openrune.sh
+
+      - name: Set up JDK 21
+        if: steps.merge.outputs.merged == 'true'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        if: steps.merge.outputs.merged == 'true'
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Cache game data
+        if: steps.merge.outputs.merged == 'true'
+        id: gamecache
+        uses: actions/cache@v6
+        with:
+          path: |
+            .data/cache
+            .data/xteas.json
+            .data/gamevals-binary/gamevals.dat
+            .data/gamevals-binary/gamevals_generated.dat
+          key: game-cache-v2-${{ hashFiles('game.example.yml') }}
+
+      - name: Generate cache and gameval sources
+        if: steps.merge.outputs.merged == 'true' && steps.gamecache.outputs.cache-hit != 'true'
+        run: ./gradlew :or-cache:freshCache :or-cache:mergePluginGamevals
+
+      - name: Rebuild sources from cached game data
+        if: steps.merge.outputs.merged == 'true' && steps.gamecache.outputs.cache-hit == 'true'
+        run: ./gradlew :or-cache:buildCache :or-cache:mergePluginGamevals
+
+      - name: Create game config and RSA keys
+        if: steps.merge.outputs.merged == 'true'
+        run: |
+          [ -f game.yml ] || cp game.example.yml game.yml
+          ./gradlew generateRsa
+
+      - name: Compile and run tests
+        if: steps.merge.outputs.merged == 'true'
+        run: ./gradlew assemble test integration
+
+      - name: Boot server to ready
+        if: steps.merge.outputs.merged == 'true'
+        run: |
+          ./gradlew run -q > boot.log 2>&1 &
+          GRADLE_PID=$!
+          for i in $(seq 1 300); do
+            grep -q "Server ready in" boot.log && break
+            kill -0 $GRADLE_PID 2>/dev/null || break
+            sleep 1
+          done
+          kill $GRADLE_PID 2>/dev/null || true
+          if ! grep -q "Server ready in" boot.log; then
+            echo "Server did not reach ready state"; tail -40 boot.log; exit 1
+          fi
+
+      - name: Push merged update
+        if: steps.merge.outputs.merged == 'true'
+        run: |
+          git push origin HEAD:main
+          echo "Merged ${{ steps.merge.outputs.commits }} OpenRune update(s) into main." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload boot log
+        if: failure() && steps.merge.outputs.merged == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: boot-log
+          path: boot.log
+          if-no-files-found: ignore
+
+      - name: Open an issue about the failed sync
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONFLICTS: ${{ steps.merge.outputs.conflicts }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="OpenRune update needs attention"
+          if [ -n "$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[]')" ]; then
+            echo "An open issue already tracks this."
+            exit 0
+          fi
+          {
+            echo "The daily OpenRune sync could not update \`main\`: $RUN_URL"
+            echo
+            if [ -n "$CONFLICTS" ]; then
+              echo "New OpenRune changes conflict with this repository's own changes in:"
+              echo
+              echo "$CONFLICTS" | sed 's/^/- `/; s/$/`/'
+              echo
+              echo "Merge OpenRune by hand (see *Updating from OpenRune* in the README), then run the workflow again."
+            else
+              echo "The merged code failed to build, test or boot, so nothing was pushed. The run log shows which step failed."
+            fi
+            echo
+            echo "Players keep the current version until this is fixed."
+          } > body.md
+          gh issue create --title "$title" --body-file body.md
