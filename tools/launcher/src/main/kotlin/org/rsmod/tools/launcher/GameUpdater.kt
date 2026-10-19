@@ -86,7 +86,7 @@ class GameUpdater(
 
     private fun updateCheckout(): UpdateResult =
         Git.open(root.toFile()).use { git ->
-            log("Checking $repositoryUrl for updates...")
+            log("Checking ${updateSource(git)} for updates...")
             fetch(git)
             val repo = git.repository
             val head = repo.resolve(Constants.HEAD)
@@ -175,11 +175,13 @@ class GameUpdater(
         return result
     }
 
+    private fun updateSource(git: Git): String =
+        git.repository.config.getString("remote", REMOTE, "url")?.takeIf(::isAnonymousTransport)
+            ?: repositoryUrl
+
     private fun fetch(git: Git) {
-        val origin = git.repository.config.getString("remote", REMOTE, "url")
-        val source = origin?.takeIf(::isAnonymousTransport) ?: repositoryUrl
         git.fetch()
-            .setRemote(source)
+            .setRemote(updateSource(git))
             .setRefSpecs(RefSpec("+refs/heads/$branch:$remoteRef"))
             .setTimeout(FETCH_TIMEOUT_SECONDS)
             .call()
