@@ -17,6 +17,8 @@ dependencies {
     implementation(libs.jackson.dataformat.yaml)
     implementation(libs.jackson.module.kotlin)
     implementation("com.formdev:flatlaf:3.7.1")
+    implementation("org.eclipse.jgit:org.eclipse.jgit:7.7.1.202607240634-r")
+    runtimeOnly("org.slf4j:slf4j-nop:2.0.17")
 }
 
 tasks.named<ShadowJar>("shadowJar") {

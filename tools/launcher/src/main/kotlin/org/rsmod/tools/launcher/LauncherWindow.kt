@@ -32,15 +32,17 @@ import javax.swing.SwingUtilities
 import javax.swing.WindowConstants
 import javax.swing.text.DefaultCaret
 import kotlin.concurrent.thread
+import kotlin.io.path.createDirectories
 import kotlin.system.exitProcess
 
-class LauncherWindow(root: Path) {
+class LauncherWindow(private val root: Path) {
     private val frame = JFrame("OpenRune Solo Launcher")
     private val logArea = JTextArea()
 
     private val server = ServerController(root, ::appendLog)
     private val rsprox = RsproxClient(root.resolve(".launcher"), ::appendLog)
     private val proxyTargets = ProxyTargets.default()
+    private val updater = GameUpdater.fromResources(root, ::appendLog)
     private val prefs = Preferences.userNodeForPackage(LauncherWindow::class.java)
 
     private val worker =
@@ -48,6 +50,9 @@ class LauncherWindow(root: Path) {
             Thread(task, "launcher-worker").apply { isDaemon = true }
         }
     private val taskRunning = AtomicBoolean(false)
+    private val checkingUpdates = AtomicBoolean(false)
+
+    @Volatile private var lastUpdateCheck: UpdateCheck? = null
 
     private val xpRate = rateSpinner(min = 0.1, max = 10_000.0, step = 1.0)
     private val gatherSuccess = rateSpinner(min = 0.1, max = 100.0, step = 0.5)
@@ -57,7 +62,8 @@ class LauncherWindow(root: Path) {
     private var skillOverrides: Map<String, SkillRateOverride> = emptyMap()
 
     private val statusLabel = JLabel()
-    private val installButton = JButton("Install / Update")
+    private val reinstallButton = JButton("Reinstall")
+    private val updateButton = JButton("Check for updates")
     private val startButton = JButton("Start server")
     private val stopButton = JButton("Stop server")
     private val playButton = JButton("Play")
@@ -68,10 +74,9 @@ class LauncherWindow(root: Path) {
         loadRates(server.gameConfig.readRates())
         server.onStateChange { SwingUtilities.invokeLater(::refreshControls) }
 
-        installButton.addActionListener {
-            val rates = currentRates()
-            runTask { server.install(rates) }
-        }
+        reinstallButton.toolTipText = "Download the OSRS cache again and rebuild everything."
+        reinstallButton.addActionListener { confirmReinstall() }
+        updateButton.addActionListener { onUpdateClicked() }
         startButton.addActionListener {
             val rates = currentRates()
             runTask { server.start(rates) }
@@ -116,6 +121,149 @@ class LauncherWindow(root: Path) {
         appendLog("Server folder: ${server.gameConfig.path.toAbsolutePath().parent}")
         if (!server.isInstalled) {
             appendLog("The server is not installed yet. Press Play to set everything up.")
+        }
+        checkForUpdatesAsync()
+    }
+
+    private fun confirmReinstall() {
+        val choice =
+            JOptionPane.showConfirmDialog(
+                frame,
+                "Reinstall downloads the OSRS cache again and rebuilds it, which takes a while.\n" +
+                    "Your rates and characters are kept. Continue?",
+                "Reinstall",
+                JOptionPane.OK_CANCEL_OPTION,
+            )
+        if (choice == JOptionPane.OK_OPTION) {
+            val rates = currentRates()
+            runTask { server.install(rates) }
+        }
+    }
+
+    private fun checkForUpdatesAsync() {
+        if (!checkingUpdates.compareAndSet(false, true)) {
+            return
+        }
+        refreshControls()
+        thread(isDaemon = true, name = "update-check") {
+            val check = updater.check()
+            if (check is UpdateCheck.Failed) {
+                appendLog("Could not check for updates: ${check.message}")
+            }
+            if (check is UpdateCheck.Available) {
+                appendLog("Update available: ${check.newCommits} new change(s).")
+            }
+            lastUpdateCheck = check
+            checkingUpdates.set(false)
+            SwingUtilities.invokeLater(::refreshControls)
+        }
+    }
+
+    private fun onUpdateClicked() {
+        when (val check = lastUpdateCheck) {
+            is UpdateCheck.Available,
+            UpdateCheck.NotLinked -> confirmUpdate(check)
+            else -> checkForUpdatesAsync()
+        }
+    }
+
+    private fun confirmUpdate(check: UpdateCheck?) {
+        val message = buildString {
+            if (check is UpdateCheck.Available) {
+                append("${check.newCommits} new change(s) are available.\n")
+                append("Latest: ${check.latestChange}\n\n")
+            } else {
+                append("This folder was downloaded as a ZIP. Updating links it to the online ")
+                append("repository and replaces the game files with the newest version.\n\n")
+            }
+            append("Your rates, settings and characters are kept.")
+            if (server.isServerAlive) {
+                append("\nThe server stops first, so log out in-game to save your progress.")
+            }
+            append("\n\nUpdate now?")
+        }
+        val choice =
+            JOptionPane.showConfirmDialog(frame, message, "Update", JOptionPane.YES_NO_OPTION)
+        if (choice == JOptionPane.YES_OPTION) {
+            val rates = currentRates()
+            runTask { performUpdate(rates) }
+        }
+    }
+
+    private fun performUpdate(rates: RateSettings) {
+        server.stop()
+        when (val result = updater.update()) {
+            UpdateResult.UpToDate -> {
+                appendLog("Already up to date.")
+                lastUpdateCheck = UpdateCheck.UpToDate
+            }
+            is UpdateResult.Failed -> {
+                appendLog("Update failed: ${result.message}")
+                showError("Update failed: ${result.message}")
+            }
+            is UpdateResult.Updated -> finishUpdate(result, rates)
+        }
+    }
+
+    private fun finishUpdate(result: UpdateResult.Updated, rates: RateSettings) {
+        lastUpdateCheck = UpdateCheck.UpToDate
+        val revisionChanged = server.syncRevision()
+        val rebuilt =
+            when {
+                revisionChanged || !server.isInstalled -> server.install(rates)
+                result.needsCacheRebuild -> server.rebuildCache()
+                else -> true
+            }
+        rsprox.updateIfOutdated()
+        SwingUtilities.invokeLater {
+            if (result.localChangesStashed) {
+                showWarning(
+                    "Your own code changes clash with the update, so they were set aside in a " +
+                        "git stash. Run `git stash pop` in the server folder to get them back."
+                )
+            }
+            when {
+                !rebuilt ->
+                    showError(
+                        "The update was downloaded, but rebuilding the game failed. " +
+                            "Check the log, then press Reinstall."
+                    )
+                result.launcherChanged -> offerRestart()
+                else -> showInfo("Update complete. Press Play to start the updated game.")
+            }
+        }
+    }
+
+    private fun offerRestart() {
+        val choice =
+            JOptionPane.showConfirmDialog(
+                frame,
+                "Update complete. The launcher itself was updated too; restart it now?",
+                "Restart launcher",
+                JOptionPane.YES_NO_OPTION,
+            )
+        if (choice == JOptionPane.YES_OPTION) {
+            relaunch()
+        }
+    }
+
+    private fun relaunch() {
+        frame.title = "Restarting launcher..."
+        thread(name = "relaunch") {
+            server.stop()
+            val command =
+                if (ServerController.IS_WINDOWS) {
+                    listOf("cmd.exe", "/c", "start", "OpenRune Launcher", "Launcher.bat")
+                } else {
+                    listOf("sh", "launcher.sh")
+                }
+            val logFile = root.resolve(".launcher").createDirectories().resolve("relaunch.log")
+            ProcessBuilder(command)
+                .directory(root.toFile())
+                .redirectErrorStream(true)
+                .redirectOutput(logFile.toFile())
+                .start()
+            exitProcess(0)
         }
     }
 
@@ -236,11 +384,14 @@ class LauncherWindow(root: Path) {
         val state = server.state
         val busy = taskRunning.get()
         val idle = state == ServerState.NotInstalled || state == ServerState.Stopped
-        installButton.isEnabled = !busy && idle
+        reinstallButton.isEnabled = !busy && idle
         startButton.isEnabled = !busy && state == ServerState.Stopped
         stopButton.isEnabled = state == ServerState.Starting || state == ServerState.Running
         playButton.isEnabled = !busy && (idle || state == ServerState.Running)
         saveButton.isEnabled = !busy
+        updateButton.isEnabled =
+            !busy && !checkingUpdates.get() && (idle || state == ServerState.Running)
+        refreshUpdateButton()
 
         val (text, color) =
             when (state) {
@@ -253,6 +404,27 @@ class LauncherWindow(root: Path) {
             }
         statusLabel.text = "● Server: $text"
         statusLabel.foreground = color
+    }
+
+    private fun refreshUpdateButton() {
+        val check = lastUpdateCheck
+        updateButton.text =
+            when {
+                checkingUpdates.get() -> "Checking for updates..."
+                check is UpdateCheck.Available -> "Update (${check.newCommits} new)"
+                check == UpdateCheck.NotLinked -> "Enable updates"
+                check == UpdateCheck.UpToDate -> "Up to date"
+                else -> "Check for updates"
+            }
+        updateButton.toolTipText =
+            when (check) {
+                is UpdateCheck.Available -> "Latest change: ${check.latestChange}"
+                UpdateCheck.NotLinked -> "Link this folder to the online repository to get updates."
+                UpdateCheck.UpToDate -> "Click to check again."
+                is UpdateCheck.Failed -> "Last check failed: ${check.message}"
+                null -> null
+            }
+        updateButton.foreground = if (check is UpdateCheck.Available) UPDATE_COLOR else null
     }
 
     private fun headerPanel(): JComponent {
@@ -330,11 +502,12 @@ class LauncherWindow(root: Path) {
 
     private fun buttonPanel(): JComponent {
         val left = JPanel(FlowLayout(FlowLayout.LEFT))
-        left.add(installButton)
         left.add(startButton)
         left.add(stopButton)
+        left.add(reinstallButton)
 
         val right = JPanel(FlowLayout(FlowLayout.RIGHT))
+        right.add(updateButton)
         right.add(playButton)
 
         val panel = JPanel(BorderLayout())
@@ -365,6 +538,16 @@ class LauncherWindow(root: Path) {
         if (dontShow.isSelected) {
             prefs.putBoolean(PREF_HIDE_PLAY_HELP, true)
         }
+    }
+
+    private fun showInfo(message: String) {
+        val info = JOptionPane.INFORMATION_MESSAGE
+        JOptionPane.showMessageDialog(frame, message, "OpenRune Launcher", info)
+    }
+
+    private fun showWarning(message: String) {
+        val warning = JOptionPane.WARNING_MESSAGE
+        JOptionPane.showMessageDialog(frame, message, "OpenRune Launcher", warning)
     }
 
     private fun showError(message: String) {
@@ -452,6 +635,8 @@ class LauncherWindow(root: Path) {
         const val PREF_HIDE_PLAY_HELP = "hidePlayHelp"
         const val MAX_LOG_CHARS = 400_000
         const val CUSTOM = "Custom"
+
+        val UPDATE_COLOR = Color(0x3CC85A)
 
         val ANSI_ESCAPE = Regex("\u001B\\[[;\\d]*[A-Za-z]")
 

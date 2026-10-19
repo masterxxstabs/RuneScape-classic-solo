@@ -71,6 +71,22 @@ class GameConfigFileTest {
     }
 
     @Test
+    fun `revision is synced from the example config`() {
+        val example = dir.resolve("game.example.yml")
+        example.writeText("revision: 242\n")
+        val file = dir.resolve("game.yml")
+        file.writeText("name: Mine\nrevision: 241\n")
+        val config = GameConfigFile(file)
+
+        assertTrue(config.syncRevisionFrom(GameConfigFile(example)))
+        assertFalse(config.syncRevisionFrom(GameConfigFile(example)))
+
+        assertEquals("242", config.revision())
+        assertEquals("Mine", config.serverName())
+        assertTrue("\nrevision: 242\n" in file.readText())
+    }
+
+    @Test
     fun `stat prefixed skill names are normalised`() {
         val file = dir.resolve("game.yml")
         file.writeText(

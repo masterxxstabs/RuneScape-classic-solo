@@ -70,10 +70,19 @@ class GameConfigFile(val path: Path, private val fallback: Path? = null) {
             set<JsonNode>("skills", gatherSkills)
         }
         gameplay.withObjectProperty("drop-rates").put("multiplier", rates.dropMultiplier)
+        write(root)
+    }
 
-        val temp = Files.createTempFile(path.toAbsolutePath().parent, "game", ".yml.tmp")
-        temp.writeText(HEADER + YAML.writeValueAsString(root))
-        Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING)
+    /** Copies `revision` from [source]; returns `true` when this file was on another revision. */
+    fun syncRevisionFrom(source: GameConfigFile): Boolean {
+        val revision = source.readTree().get("revision") ?: return false
+        val root = readTree() as? ObjectNode ?: return false
+        if (root.get("revision") == revision) {
+            return false
+        }
+        root.set<JsonNode>("revision", revision)
+        write(root)
+        return true
     }
 
     fun revision(): String = readTree().path("revision").asText(DEFAULT_REVISION)
@@ -81,6 +90,12 @@ class GameConfigFile(val path: Path, private val fallback: Path? = null) {
     fun gamePort(): Int = readTree().path("game-port").asInt(DEFAULT_GAME_PORT)
 
     fun serverName(): String = readTree().path("name").asText(DEFAULT_NAME)
+
+    private fun write(root: JsonNode) {
+        val temp = Files.createTempFile(path.toAbsolutePath().parent, "game", ".yml.tmp")
+        temp.writeText(HEADER + YAML.writeValueAsString(root))
+        Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING)
+    }
 
     private fun readTree(): JsonNode {
         val source = path.takeIf { it.isRegularFile() } ?: fallback?.takeIf { it.isRegularFile() }

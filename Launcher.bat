@@ -19,6 +19,17 @@ if errorlevel 1 (
     exit /b 1
 )
 
+rem Run a copy so an update can rebuild the launcher while the old one is still closing.
+if not exist ".launcher" mkdir ".launcher"
+set /a tries=0
+:copy
+copy /y "tools\launcher\build\libs\launcher.jar" ".launcher\launcher.jar" >nul 2>nul && goto run
+set /a tries+=1
+if %tries% geq 15 goto run
+ping -n 2 127.0.0.1 >nul
+goto copy
+
+:run
 set "JAVAW=javaw"
 if defined JAVA_HOME set "JAVAW=%JAVA_HOME%\bin\javaw.exe"
-start "" "%JAVAW%" -jar "tools\launcher\build\libs\launcher.jar"
+start "" "%JAVAW%" -jar ".launcher\launcher.jar"

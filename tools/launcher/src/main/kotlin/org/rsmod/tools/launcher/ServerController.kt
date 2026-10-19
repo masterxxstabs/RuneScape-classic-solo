@@ -27,8 +27,10 @@ class ServerController(private val root: Path, private val log: (String) -> Unit
 
     private val process = AtomicReference<Process?>(null)
 
+    private val exampleConfig = GameConfigFile(root.resolve("game.example.yml"))
+
     val gameConfig: GameConfigFile =
-        GameConfigFile(root.resolve("game.yml"), fallback = root.resolve("game.example.yml"))
+        GameConfigFile(root.resolve("game.yml"), fallback = exampleConfig.path)
 
     @Volatile
     var state: ServerState = idleState()
@@ -47,9 +49,19 @@ class ServerController(private val root: Path, private val log: (String) -> Unit
         listeners += listener
     }
 
+    /** Moves game.yml to the revision in game.example.yml; returns `true` if it was behind. */
+    fun syncRevision(): Boolean {
+        if (!gameConfig.exists || !gameConfig.syncRevisionFrom(exampleConfig)) {
+            return false
+        }
+        log("The game moved to OSRS revision ${gameConfig.revision()}.")
+        return true
+    }
+
     fun install(rates: RateSettings): Boolean {
         setState(ServerState.Busy)
         log("Installing the server. The first install downloads the OSRS cache and takes a while.")
+        syncRevision()
         val previousConfig = gameConfig.path.takeIf { it.isRegularFile() }?.readBytes()
         val success = gradle("install") && gradle(":or-cache:mergePluginGamevals")
         previousConfig?.let(gameConfig.path::writeBytes)
@@ -59,6 +71,15 @@ class ServerController(private val root: Path, private val log: (String) -> Unit
         log(if (success) "Install finished." else "Install failed - see the log above.")
         setState(idleState())
         return success && isInstalled
+    }
+
+    fun rebuildCache(): Boolean {
+        setState(ServerState.Busy)
+        log("Rebuilding the game cache with the updated content...")
+        val success = gradle(":or-cache:buildCache", ":or-cache:mergePluginGamevals")
+        log(if (success) "Cache rebuilt." else "Cache rebuild failed - see the log above.")
+        setState(idleState())
+        return success
     }
 
     fun start(rates: RateSettings): Boolean {
@@ -179,7 +200,7 @@ class ServerController(private val root: Path, private val log: (String) -> Unit
         private const val GRACEFUL_STOP_SECONDS = 60L
         private const val FORCE_STOP_SECONDS = 15L
 
-        private val IS_WINDOWS: Boolean = System.getProperty("os.name").lowercase().contains("win")
+        val IS_WINDOWS: Boolean = System.getProperty("os.name").lowercase().contains("win")
 
         private val SERVER_JVM_ARGS: List<String> =
             listOf(
