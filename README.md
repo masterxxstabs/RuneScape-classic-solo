@@ -45,7 +45,8 @@ anywhere.
 6. Log in to RuneLite with **any username and password**. The account is created the first time
    you log in, and it is an admin account (see [Commands](#admin-commands)).
 
-Next time, open the launcher and click **Play**.
+Next time, open the launcher and click **Play**. When the **Update** button turns green, click it
+first to get the newest version (see [Updates](#updates)).
 
 ## Rates
 
@@ -132,24 +133,54 @@ OpenRune is still being built, so not all of OSRS is there yet:
 
 [PROGRESS.md](PROGRESS.md) lists everything that is done.
 
-## Updating from OpenRune
+## Updates
 
-This repository keeps OpenRune's full history, so you can pull in their newest content:
+Updates reach you in two steps:
+
+1. **OpenRune → this repository.** Every day the
+   [Sync OpenRune](.github/workflows/sync-openrune.yml) workflow merges new content from
+   OpenRune into `main`. It only pushes after the merged server builds, passes its tests and
+   boots. To sync right away, open **Actions → Sync OpenRune → Run workflow** on GitHub.
+2. **This repository → your computer.** The launcher checks for new versions when it opens. When
+   the **Update** button turns green, click it. The launcher then:
+   - stops the server, if it is running, and downloads the new version;
+   - rebuilds the game cache, or downloads a new OSRS cache if the game moved to a new revision;
+   - updates RSProx if a newer release is out;
+   - restarts itself if the launcher was updated too.
+
+Your rates, `game.yml`, characters and everything in `.data/` are kept. If you downloaded the
+repository as a ZIP, the button says **Enable updates**. The first click links the folder to
+GitHub and brings it up to date; you don't need Git installed for this.
+
+If you changed the server code yourself, the update keeps your changes. If they clash with the
+update, your changes are set aside with `git stash` and the launcher tells you how to restore
+them. The update source is set in `tools/launcher/src/main/resources/launcher.properties`; change
+it if you fork this repository.
+
+### When the daily sync can't merge
+
+Sometimes OpenRune changes the same lines this repository changed. The sync then pushes nothing
+and opens a GitHub issue named **OpenRune update needs attention**, which lists the conflicting
+files. To merge by hand:
 
 ```sh
 git remote add upstream https://github.com/OpenRune/OpenRune-Server.git   # once
 git fetch upstream
-git merge upstream/main
+git merge upstream/main          # fix the conflicts it reports, then commit
+git push
 ```
 
-After an update that changes the game revision, press **Install / Update** in the launcher.
+Close the issue afterwards. The next sync continues from there.
 
 ## Troubleshooting
 
 - **The launcher window doesn't open.** Run `java -version` in a terminal. It must say 21 or
   newer.
-- **Install fails while downloading the cache.** OpenRS2 may be busy. Press
-  **Install / Update** again.
+- **Install fails while downloading the cache.** OpenRS2 may be busy. Press **Reinstall**.
+- **The game looks broken after an update.** Press **Reinstall** to download and rebuild the
+  cache from scratch.
+- **The Update button says "Check for updates".** The last check couldn't reach GitHub.
+  Hover over the button to see why, or click it to try again.
 - **RuneLite says it can't connect.** Check that the launcher shows **Server: Online**, and that
   RSProx has **OpenRune Solo** selected. If you re-installed, press **Play** once more: it
   rewrites the RSProx target with your server's new key.
@@ -172,7 +203,10 @@ top of OpenRune:
 - `content/other/rates`: loads `gameplay.xp-rates` and `gameplay.gather-rates` from `game.yml`.
 - `content/other/console`: stops the server cleanly when `stop` is typed on its console.
 - `tools/launcher`: the launcher (Kotlin + Swing). `./gradlew :tools:launcher:run` starts it
-  from source.
+  from source. `GameUpdater.kt` updates the folder with JGit.
+- `.github/workflows/sync-openrune.yml` and `.github/scripts/merge-openrune.sh`: the daily
+  OpenRune merge. The script keeps this README and the upstream workflows removed here; any
+  other conflict stops the sync.
 
 ## Credits and license
 
