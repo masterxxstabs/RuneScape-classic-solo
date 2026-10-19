@@ -4,6 +4,7 @@ import kotlin.random.Random
 import org.rsmod.api.player.dialogue.Dialogue
 import org.rsmod.api.player.midiJingle
 import org.rsmod.api.player.protect.ProtectedAccess
+import org.rsmod.api.player.stat.SkillRates
 import org.rsmod.api.player.vars.VarPlayerIntMapSetter
 import org.rsmod.api.player.vars.boolVarBit
 import org.rsmod.api.player.vars.intVarBit
@@ -318,7 +319,7 @@ class HisFaithfulServants :
 
     private suspend fun ProtectedAccess.rubLamp() {
         startDialogue {
-            val xp = (LAMP_XP * player.xpRate * player.globalXpRate).toInt()
+            val xp = (LAMP_XP * SkillRates.xpRate(player, "stat.prayer") * player.globalXpRate).toInt()
             val claim = choice2("Yes.", true, "No.", false, title = "Use the lamp to receive ${"%,d".format(xp)} Prayer experience?")
             if (!claim || access.invDel(access.inv, "obj.hfs_reward_lamp").failure) return@startDialogue
             player.lampClaimed = true

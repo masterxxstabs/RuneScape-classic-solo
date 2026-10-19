@@ -91,6 +91,7 @@ import org.rsmod.api.player.output.soundSynth
 import org.rsmod.api.player.output.spam
 import org.rsmod.api.player.queueDeath
 import org.rsmod.api.player.startInvTransmit
+import org.rsmod.api.player.stat.SkillRates
 import org.rsmod.api.player.stat.stat
 import org.rsmod.api.player.stat.statAdd
 import org.rsmod.api.player.stat.statAdvance
@@ -1321,7 +1322,7 @@ public class ProtectedAccess(
     public fun statAdvance(
         stat: String,
         xp: Double,
-        rate: Double = player.xpRate,
+        rate: Double = SkillRates.xpRate(player, stat),
         globalRate: Double = player.globalXpRate,
     ): Int {
         return player.statAdvance(stat, xp, rate, globalRate)

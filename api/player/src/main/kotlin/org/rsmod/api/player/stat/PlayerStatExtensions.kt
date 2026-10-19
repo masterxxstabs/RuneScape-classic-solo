@@ -57,7 +57,8 @@ public fun Player.statRestoreAll(stats: Iterable<String>) {
 /**
  * Increases the player's current [stat] experience.
  *
- * @param rate The xp multiplier applied to [xp]. Defaults to the player's [Player.xpRate].
+ * @param rate The xp multiplier applied to [xp]. Defaults to the server's configured rate for
+ *   [stat], falling back to the player's [Player.xpRate] (see [SkillRates.xpRate]).
  * @param globalRate A global xp multiplier applied alongside [rate]. This is separated for
  *   convenience - for example, if the caller wants to ignore the player's personal xp rate but
  *   still apply global modifiers like Double XP Weekends. Defaults to the player's
@@ -68,7 +69,7 @@ public fun Player.statRestoreAll(stats: Iterable<String>) {
 public fun Player.statAdvance(
     stat: String,
     xp: Double,
-    rate: Double = xpRate,
+    rate: Double = SkillRates.xpRate(this, stat),
     globalRate: Double = globalXpRate,
     source: XpSource = XpSource.Natural,
 ): Int = PlayerSkillXP.internalAddXP(this, stat, xp, rate = rate * globalRate, source)
@@ -294,16 +295,17 @@ public fun Player.statRandom(
 
     val visibleLevel = stat(internal)
     val effectiveLevel = visibleLevel.coerceIn(1, stat.maxLevel) + invisibleBoost
-    return statRandomRoll(random, low, high, effectiveLevel, stat.maxLevel)
+    return statRandomRoll(random, internal, low, high, effectiveLevel, stat.maxLevel)
 }
 
 private fun statRandomRoll(
     random: GameRandom,
+    stat: String,
     low: Int,
     high: Int,
     effectiveLevel: Int,
     maxLevel: Int,
 ): Boolean {
     val rate = SkillingSuccessRate.successRate(low, high, effectiveLevel, maxLevel)
-    return rate > random.randomDouble()
+    return SkillRates.successChance(stat, rate) > random.randomDouble()
 }

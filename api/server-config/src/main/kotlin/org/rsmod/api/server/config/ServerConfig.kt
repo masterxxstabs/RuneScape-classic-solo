@@ -51,6 +51,10 @@ public data class GameplayConfig(
     val questRequirements: QuestRequirementsYaml = QuestRequirementsYaml(),
     @JsonProperty("drop-rates")
     val dropRates: DropRatesYaml = DropRatesYaml(),
+    @JsonProperty("xp-rates")
+    val xpRates: XpRatesYaml = XpRatesYaml(),
+    @JsonProperty("gather-rates")
+    val gatherRates: GatherRatesYaml = GatherRatesYaml(),
     @JsonProperty("level-up-popups")
     val levelUpPopups: Boolean = false,
 )
@@ -58,6 +62,26 @@ public data class GameplayConfig(
 @JsonIgnoreProperties(ignoreUnknown = true)
 public data class DropRatesYaml(
     val multiplier: Double = 1.0,
+)
+
+/** A null [multiplier] keeps each character's own realm xp rate. */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public data class XpRatesYaml(
+    val multiplier: Double? = null,
+    val skills: Map<String, Double> = emptyMap(),
+)
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public data class GatherRatesYaml(
+    @JsonProperty("success-multiplier") val successMultiplier: Double = 1.0,
+    @JsonProperty("yield-multiplier") val yieldMultiplier: Double = 1.0,
+    val skills: Map<String, GatherSkillRatesYaml> = emptyMap(),
+)
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public data class GatherSkillRatesYaml(
+    @JsonProperty("success-multiplier") val successMultiplier: Double? = null,
+    @JsonProperty("yield-multiplier") val yieldMultiplier: Double? = null,
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
